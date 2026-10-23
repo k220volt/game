@@ -27,6 +27,10 @@
 
 실제 iPhone Safari / Android Chrome 하드웨어, 실기기의 Safe Area/주소창 변화, 오디오 출력 및 블루투스 지연, 실제 운영체제 백그라운드 복귀, 저사양 장치의 장시간 프레임·메모리 프로파일링. 에뮬레이션 통과를 실기기 확인으로 표시하지 않습니다.
 
+## 배포
+
+GitHub main 업로드와 Actions의 npm ci, 단위 테스트, 타입 검사, 빌드, Pages 업로드·배포가 성공했습니다. 기존 Pages의 `legacy` 브랜치 배포를 `workflow`로 전환했습니다. 주소: https://k220volt.github.io/game/ . 로컬 배포본은 `dist/` 및 `deployment.zip`에 보관합니다.
+
 ## 재현
 
 `npm run preview -- --port 5175`로 서버를 켜고 PowerShell에서 `$env:GAME_URL='http://127.0.0.1:5175/game/'; npm run test:e2e`를 실행합니다. 설치된 Google Chrome이 필요합니다. 테스트 스크린샷은 `test-results/`에 생성됩니다.

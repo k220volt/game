@@ -55,11 +55,11 @@ Phaser의 입력·트윈·장면 관리가 이번 게임의 애니메이션 요�
 
 대상 저장소: https://github.com/k220volt/game
 
-예정 서비스 주소: https://k220volt.github.io/game/
+서비스 주소: https://k220volt.github.io/game/
 
 `vite.config.ts`의 `base: '/game/'`가 저장소 경로를 처리합니다. 다른 저장소에 옮기면 해당 값을 바꾸세요. 이미지 주소는 Vite base를 따릅니다.
 
-`.github/workflows/deploy.yml`은 main push 시 설치 → 단위 테스트 → 타입 검사/빌드 → Pages 배포를 수행합니다. 저장소 **Settings → Pages → Build and deployment → Source: GitHub Actions**를 선택하세요. 환경 보호 규칙이 있으면 github-pages 배포를 허용해야 합니다. 비밀 API 키나 서버 설정은 필요 없습니다.
+`.github/workflows/deploy.yml`은 main push 시 설치 → 단위 테스트 → 타입 검사/빌드 → Pages 배포를 수행합니다. 현재 저장소는 **Settings → Pages → Build and deployment → Source: GitHub Actions**로 설정했습니다. 저장소를 복제해 새로 배포할 때에도 같은 설정을 선택하세요. 환경 보호 규칙이 있으면 github-pages 배포를 허용해야 합니다. 비밀 API 키나 서버 설정은 필요 없습니다.
 
 자동 배포 권한이 부족해도 `dist/`에 완성된 배포 파일이 남습니다. 파일을 직접 더블클릭하지 말고 HTTP 정적 서버에서 서비스하세요. `deployment.zip`은 dist 내용을 담은 로컬 배포용 압축본입니다.
 
