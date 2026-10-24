@@ -1,5 +1,7 @@
 export type Hit = 'eppy' | 'flower' | 'empty' | 'miss';
 export const TOTAL_ROUNDS = 20;
+export const MAX_CHANCES = 3;
+export const MAX_TOTAL_SCORE = TOTAL_ROUNDS * 10 + (MAX_CHANCES - 1) * 6;
 // Speed rises by the same ratio each round; duration is inverse speed.
 export const DURATIONS = Array.from({ length: TOTAL_ROUNDS }, (_, i) =>
   (3000 / 1.3) / Math.pow(15, i / (TOTAL_ROUNDS - 1)));
@@ -29,7 +31,23 @@ export function positions(random = Math.random) {
   }
   return slots;
 }
+export class Run {
+  total = 0;
+  failures = 0;
+  complete = false;
+  private recorded = new WeakSet<Round>();
+  get remaining() { return MAX_CHANCES - this.failures; }
+  get over() { return this.complete || this.remaining === 0; }
+  finish(round: Round) {
+    if (!round.done || this.over || this.recorded.has(round)) return false;
+    this.recorded.add(round);
+    this.total += round.score;
+    if (!round.passed) this.failures++;
+    this.complete = round.passed && round.level === TOTAL_ROUNDS;
+    return true;
+  }
+}
 export function readBest() {
-  try { const n = Number(localStorage.getItem('kiss-park-best')); return Number.isFinite(n) ? Math.min(TOTAL_ROUNDS * 10, Math.max(0, n)) : 0; } catch { return 0; }
+  try { const n = Number(localStorage.getItem('kiss-park-best')); return Number.isFinite(n) ? Math.min(MAX_TOTAL_SCORE, Math.max(0, n)) : 0; } catch { return 0; }
 }
 export function saveBest(score: number) { const best = Math.max(readBest(), score); try { localStorage.setItem('kiss-park-best', String(best)); } catch { /* Storage may be unavailable in private mode. */ } return best; }

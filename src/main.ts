@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Round, positions, DELTAS, TOTAL_ROUNDS, readBest, saveBest, type Hit } from './logic';
+import { Round, Run, positions, DELTAS, TOTAL_ROUNDS, readBest, saveBest, type Hit } from './logic';
 import { Sound } from './audio';
 import './style.css';
 
@@ -10,7 +10,7 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
 let scene: Park;
 const overlay = $('overlay');
-let total = 0;
+let run = new Run();
 let resultHearts: ReturnType<typeof setInterval> | undefined;
 const clearHearts = () => { clearInterval(resultHearts); document.querySelectorAll('.floating-heart').forEach(e => e.remove()); };
 function hearts() {
@@ -21,19 +21,20 @@ function hearts() {
 }
 function best() { $('best').textContent = `BEST ${readBest()}`; }
 function home() {
-  clearHearts(); scene?.reset(); total = 0; $('hud').hidden = true; overlay.hidden = false;
+  clearHearts(); scene?.reset(); run = new Run(); $('hud').hidden = true; overlay.hidden = false;
   overlay.innerHTML = `<span class="cover-top">꽃이 피면, 사랑도 피어나요</span><img class="game-title" src="${asset('title')}" alt="이삐댕이의 뽀뽀공원"><p class="cover-description">꼭꼭 숨은 이삐를 찾아<br>달콤한 뽀뽀를 전해 주세요 ♡</p><img class="cover-couple" src="${asset('kiss')}" alt="이삐에게 뽀뽀하는 댕이"><button id="start" class="primary">공원으로 놀러 가기 <span aria-hidden="true">♡</span></button><p class="button-sub">이삐 +1 · 꽃 −2 · 빈 곳 −1 · 10번 중 7점 성공</p><span class="best-pill">YOUR BEST · ${readBest()} POINTS</span>`;
   $('start').onclick = () => begin(1);
   best();
 }
 function begin(level: number) { clearHearts(); overlay.hidden = true; $('hud').hidden = false; sound.unlock(); scene.startRound(level); }
 function showResult(round: Round) {
-  const win = round.passed; total += round.score;
-  saveBest(total); best(); sound.active = false; sound.fanfare(win); overlay.hidden = false;
+  const win = round.passed;
+  if (!run.finish(round)) return;
+  saveBest(run.total); best(); sound.active = false; sound.fanfare(win); overlay.hidden = false;
   const complete = win && round.level === TOTAL_ROUNDS;
-  overlay.innerHTML = `<div class="result-card"><span class="eyebrow">${complete ? 'HAPPILY EVER AFTER' : win ? `ROUND ${round.level} CLEAR` : 'ONE MORE LITTLE KISS'}</span><h2>${complete ? '우리 사랑, 활짝 피었네!' : win ? '이삐의 뽀뽀 세례!' : '힝… 뽀뽀해 줘!'}</h2><img class="result-art ${win ? '' : 'sad'}" src="${asset(win ? 'celebrate' : 'cry')}" alt="${win ? '이삐가 댕이에게 뽀뽀 세례를 퍼붓는 모습' : '드러누워 징징 울고 있는 댕이'}"><div class="result-score">${round.score}<small> / 10점</small></div><p>${complete ? `스무 번의 만남, 총 ${total}점의 사랑을 모았어요.` : win ? '꽃보다 달콤한 뽀뽀, 쪽쪽쪽!<br>다음에는 이삐가 조금 더 빨라져요.' : '7점이면 이삐의 뽀뽀를 받을 수 있어요.<br>꽃에 속지 말고 다시 찾아볼까요?'}</p><button id="next" class="primary">${win && !complete ? '다음 꽃밭으로 →' : '처음부터 다시 놀기 ♡'}</button><button id="home" class="secondary">시작 화면으로</button></div>`;
+  overlay.innerHTML = `<div class="result-card"><span class="eyebrow">${complete ? 'HAPPILY EVER AFTER' : win ? `ROUND ${round.level} CLEAR` : 'ONE MORE LITTLE KISS'}</span><h2>${complete ? '우리 사랑, 활짝 피었네!' : win ? '이삐의 뽀뽀 세례!' : '힝… 뽀뽀해 줘!'}</h2><img class="result-art ${win ? '' : 'sad'}" src="${asset(win ? 'celebrate' : 'cry')}" alt="${win ? '이삐가 댕이에게 뽀뽀 세례를 퍼붓는 모습' : '드러누워 징징 울고 있는 댕이'}"><div class="result-score">${round.score}<small> / 10점</small></div><div class="total-score ${run.over ? 'final-score' : ''}"><span>${run.over ? '최종 점수' : '총 점수'}</span><strong>${run.total}<small>점</small></strong></div><p>${complete ? `스무 번의 만남, 총 ${run.total}점의 사랑을 모았어요.` : win ? '꽃보다 달콤한 뽀뽀, 쪽쪽쪽!<br>다음에는 이삐가 조금 더 빨라져요.' : run.over ? '세 번의 기회를 모두 사용했어요.<br>다시 시작해서 이삐를 만나러 가요!' : `남은 기회 ${run.remaining}번!<br>${round.level}라운드에서 다시 찾아볼까요?`}</p><button id="next" class="primary">${run.over ? '처음부터 다시 놀기 ♡' : win ? '다음 꽃밭으로 →' : '이 라운드 다시 도전 ♡'}</button><button id="home" class="secondary">시작 화면으로</button></div>`;
   if (win) { hearts(); resultHearts = setInterval(hearts, 240); }
-  $('next').onclick = () => { if (win && !complete) begin(round.level + 1); else { total = 0; begin(1); } };
+  $('next').onclick = () => { if (run.over) { run = new Run(); begin(1); } else begin(win ? round.level + 1 : round.level); };
   $('home').onclick = home;
 }
 function pause() {
@@ -42,7 +43,7 @@ function pause() {
   overlay.hidden = false;
   overlay.innerHTML = '<div class="result-card"><span class="pause-title">☁</span><h2>꽃그늘에서 잠깐 쉬어요</h2><p>이삐도 기다리고 있어요.<br>준비되면 다시 만나러 가요!</p><button id="resume" class="primary">계속 놀기 →</button><button id="restart" class="secondary">처음부터 다시 시작</button></div>';
   $('resume').onclick = () => { overlay.hidden = true; scene.paused = false; scene.tweens.resumeAll(); sound.unlock(); sound.active = true; };
-  $('restart').onclick = () => { total = 0; begin(1); };
+  $('restart').onclick = () => { run = new Run(); begin(1); };
 }
 
 class Park extends Phaser.Scene {
@@ -155,6 +156,6 @@ document.addEventListener('contextmenu',e=>{if((e.target as HTMLElement).closest
 document.addEventListener('keydown',e=>{if(e.key==='Escape')pause();});
 const game = new Phaser.Game({type:Phaser.CANVAS,parent:'game',width:420*pixelRatio,height:740*pixelRatio,backgroundColor:'#c8d5ad',scene:Park,scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},render:{antialias:true,pixelArt:false},fps:{target:60},input:{activePointers:1}});
 // A read-only snapshot supports reproducible browser QA without bypassing input handling.
-if(import.meta.env.DEV || new URLSearchParams(location.search).has('test')) Object.defineProperty(window,'__park',{get:()=>scene?{playing:scene.playing,paused:scene.paused,locked:scene.round.locked,score:scene.round.score,attempts:scene.round.outcomes.length,level:scene.round.level,target:scene.target,flowers:[...scene.flowerSlots],remaining:scene.remaining,objects:scene.children.length,total}:null});
+if(import.meta.env.DEV || new URLSearchParams(location.search).has('test')) Object.defineProperty(window,'__park',{get:()=>scene?{playing:scene.playing,paused:scene.paused,locked:scene.round.locked,score:scene.round.score,attempts:scene.round.outcomes.length,level:scene.round.level,target:scene.target,flowers:[...scene.flowerSlots],remaining:scene.remaining,objects:scene.children.length,total:run.total,remainingChances:run.remaining}:null});
 window.addEventListener('pagehide',()=>{sound.suspend();});
 if(import.meta.hot)import.meta.hot.dispose(()=>{clearHearts();game.destroy(true);});

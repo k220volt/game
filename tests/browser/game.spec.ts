@@ -1,5 +1,5 @@
 import {test,expect, type Page} from '@playwright/test';
-type State={playing:boolean;paused:boolean;locked:boolean;score:number;attempts:number;level:number;target:number;flowers:number[];remaining:number;objects:number};
+type State={playing:boolean;paused:boolean;locked:boolean;score:number;attempts:number;level:number;target:number;flowers:number[];remaining:number;objects:number;total:number;remainingChances:number};
 const state=(p:Page)=>p.evaluate(()=> (window as unknown as {__park:State}).__park);
 async function slot(p:Page,n:number,touch=false){const b=(await p.locator('canvas').boundingBox())!;const x=b.x+(86+n%3*124)/420*b.width,y=b.y+(302+Math.floor(n/3)*117)/740*b.height;if(touch)await p.touchscreen.tap(x,y);else await p.mouse.click(x,y);}
 async function ready(p:Page){await expect.poll(async()=>{const s=await state(p);return s?.playing&&!s.locked&&!s.paused;}).toBe(true);}
@@ -11,7 +11,7 @@ test('mobile touch, 20 rounds, result animation, persisted best and restart',asy
   for(let i=0;i<10;i++){await clockReady(p);const s=await state(p);await slot(p,s.target,true);if(i===0&&round===1)await p.screenshot({path:'test-results/mobile-kiss.png'});await expect.poll(async()=>(await state(p)).attempts).toBe(i+1);}
   await p.clock.runFor(1200);await expect(p.locator('#next')).toBeVisible();await expect(p.locator('#round-label')).toHaveText(`ROUND ${String(round).padStart(2,'0')} / 20`);expect((await state(p)).flowers.length).toBe(Math.min(round+1,4));expect((await state(p)).score).toBe(10);await p.screenshot({path:`test-results/round-${round}-clear.png`});if(round<20)await p.locator('#next').tap();
  }
- await expect(p.locator('h2').filter({hasText:'우리 사랑'})).toBeVisible();expect(await p.evaluate(()=>localStorage.getItem('kiss-park-best'))).toBe('200');await p.locator('#next').tap();await clockReady(p);expect((await state(p)).level).toBe(1);expect((await state(p)).score).toBe(0);await p.reload();await expect(p.locator('#best')).toHaveText('BEST 200');expect(errors).toEqual([]);await context.close();
+ await expect(p.locator('h2').filter({hasText:'우리 사랑'})).toBeVisible();await expect(p.locator('.final-score')).toHaveText('최종 점수200점');expect(await p.evaluate(()=>localStorage.getItem('kiss-park-best'))).toBe('200');await p.locator('#next').tap();await clockReady(p);expect((await state(p)).level).toBe(1);expect((await state(p)).score).toBe(0);await p.reload();await expect(p.locator('#best')).toHaveText('BEST 200');expect(errors).toEqual([]);await context.close();
 });
 test('mouse penalties, pause freezes clock, rapid clicks, timeout and failure',async({page:p})=>{
  await p.setViewportSize({width:1440,height:1000});await p.goto('?test');await expect(p.locator('#start')).toBeVisible();await expect.poll(()=>p.locator('img').evaluateAll(imgs=>imgs.every(img=>(img as HTMLImageElement).naturalWidth>0))).toBe(true);await p.screenshot({path:'test-results/desktop-home.png'});await p.locator('#start').click();await ready(p);
@@ -27,3 +27,23 @@ test('layouts and resize preserve session, sound controls work',async({page:p})=
  await p.setViewportSize({width:390,height:844});await p.locator('#start').click();await ready(p);await slot(p,(await state(p)).target);await p.setViewportSize({width:844,height:390});expect((await state(p)).score).toBe(1);
 });
 
+
+test('three chances retry the failed round and show cumulative and final scores',async({page:p})=>{
+ await p.setViewportSize({width:390,height:844});await p.goto('?test');await expect(p.locator('#start')).toBeVisible();
+ await p.clock.install();await p.clock.pauseAt(new Date(Date.now()+1000));await p.locator('#start').click();
+ const cases=[{level:1,win:true,total:10,left:3},{level:2,win:false,total:-10,left:2},{level:2,win:true,total:0,left:2},{level:3,win:false,total:-20,left:1},{level:3,win:false,total:-40,left:0}];
+ for(const [index,c] of cases.entries()){
+  for(let i=0;i<10;i++){await clockReady(p);const s=await state(p);expect(s.level).toBe(c.level);await slot(p,c.win?s.target:s.flowers[0]);}
+  await p.clock.runFor(1200);await expect(p.locator('#next')).toBeVisible();
+  expect((await state(p)).remainingChances).toBe(c.left);expect((await state(p)).total).toBe(c.total);
+  await expect(p.locator('.total-score')).toHaveText(`${c.left?'총 점수':'최종 점수'}${c.total}점`);
+  if(index<cases.length-1){if(!c.win)await expect(p.locator('#next')).toHaveText('이 라운드 다시 도전 ♡');await p.locator('#next').click();expect((await state(p)).score).toBe(0);}
+ }
+ await expect(p.locator('.final-score')).toBeVisible();
+ for(const [width,height] of [[320,568],[375,667],[844,390]]){
+  await p.setViewportSize({width,height});const shell=(await p.locator('.game-shell').boundingBox())!;
+  for(const selector of ['.result-card','.final-score','#next','#home']){const b=(await p.locator(selector).boundingBox())!;expect(b.y).toBeGreaterThanOrEqual(shell.y);expect(b.y+b.height).toBeLessThanOrEqual(shell.y+shell.height+1);}
+  await p.screenshot({path:`test-results/three-chances-${width}.png`});
+ }
+ await p.locator('#next').click();expect((await state(p)).remainingChances).toBe(3);expect((await state(p)).total).toBe(0);expect((await state(p)).level).toBe(1);
+});
