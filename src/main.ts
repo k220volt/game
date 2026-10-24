@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { Round, positions, DELTAS, readBest, saveBest, type Hit } from './logic';
+import { Round, positions, DELTAS, TOTAL_ROUNDS, readBest, saveBest, type Hit } from './logic';
 import { Sound } from './audio';
 import './style.css';
 
@@ -30,8 +30,8 @@ function begin(level: number) { clearHearts(); overlay.hidden = true; $('hud').h
 function showResult(round: Round) {
   const win = round.passed; total += round.score;
   saveBest(total); best(); sound.active = false; sound.fanfare(win); overlay.hidden = false;
-  const complete = win && round.level === 3;
-  overlay.innerHTML = `<div class="result-card"><span class="eyebrow">${complete ? 'HAPPILY EVER AFTER' : win ? `ROUND ${round.level} CLEAR` : 'ONE MORE LITTLE KISS'}</span><h2>${complete ? '우리 사랑, 활짝 피었네!' : win ? '이삐의 뽀뽀 세례!' : '힝… 뽀뽀해 줘!'}</h2><img class="result-art ${win ? '' : 'sad'}" src="${asset(win ? 'celebrate' : 'cry')}" alt="${win ? '이삐가 댕이에게 뽀뽀 세례를 퍼붓는 모습' : '드러누워 징징 울고 있는 댕이'}"><div class="result-score">${round.score}<small> / 10점</small></div><p>${complete ? `세 번의 만남, 총 ${total}점의 사랑을 모았어요.` : win ? '꽃보다 달콤한 뽀뽀, 쪽쪽쪽!<br>다음에는 이삐가 조금 더 빨라져요.' : '7점이면 이삐의 뽀뽀를 받을 수 있어요.<br>꽃에 속지 말고 다시 찾아볼까요?'}</p><button id="next" class="primary">${win && !complete ? '다음 꽃밭으로 →' : '처음부터 다시 놀기 ♡'}</button><button id="home" class="secondary">시작 화면으로</button></div>`;
+  const complete = win && round.level === TOTAL_ROUNDS;
+  overlay.innerHTML = `<div class="result-card"><span class="eyebrow">${complete ? 'HAPPILY EVER AFTER' : win ? `ROUND ${round.level} CLEAR` : 'ONE MORE LITTLE KISS'}</span><h2>${complete ? '우리 사랑, 활짝 피었네!' : win ? '이삐의 뽀뽀 세례!' : '힝… 뽀뽀해 줘!'}</h2><img class="result-art ${win ? '' : 'sad'}" src="${asset(win ? 'celebrate' : 'cry')}" alt="${win ? '이삐가 댕이에게 뽀뽀 세례를 퍼붓는 모습' : '드러누워 징징 울고 있는 댕이'}"><div class="result-score">${round.score}<small> / 10점</small></div><p>${complete ? `스무 번의 만남, 총 ${total}점의 사랑을 모았어요.` : win ? '꽃보다 달콤한 뽀뽀, 쪽쪽쪽!<br>다음에는 이삐가 조금 더 빨라져요.' : '7점이면 이삐의 뽀뽀를 받을 수 있어요.<br>꽃에 속지 말고 다시 찾아볼까요?'}</p><button id="next" class="primary">${win && !complete ? '다음 꽃밭으로 →' : '처음부터 다시 놀기 ♡'}</button><button id="home" class="secondary">시작 화면으로</button></div>`;
   if (win) { hearts(); resultHearts = setInterval(hearts, 240); }
   $('next').onclick = () => { if (win && !complete) begin(round.level + 1); else { total = 0; begin(1); } };
   $('home').onclick = home;
@@ -91,13 +91,13 @@ class Park extends Phaser.Scene {
   clearTransient() { for(const o of this.transient){this.tweens.killTweensOf(o);o.destroy();}this.transient=[]; }
   startRound(level: number) {
     this.reset(); this.round = new Round(level); this.playing = true; this.gap=1400; sound.active=true;
-    this.message(`ROUND ${level} · ${['설레는 만남','두근두근','사랑의 질주'][level-1]}`); this.sync();
+    this.message(`ROUND ${level} · ${['설레는 만남','두근두근','사랑의 질주'][Math.min(level, 3)-1]}`); this.sync();
   }
   next() {
     this.clearTransient(); this.clearTargets(); $('toast').classList.remove('show');
     if (this.round.done) { this.playing=false; showResult(this.round); return; }
     let slots=positions(); if(slots[0]===this.lastTarget) [slots[0],slots[1]]=[slots[1],slots[0]];
-    this.target=slots[0];this.lastTarget=this.target;this.flowerSlots=slots.slice(1,2+this.round.level);
+    this.target=slots[0];this.lastTarget=this.target;this.flowerSlots=slots.slice(1,2+Math.min(this.round.level, 3));
     [this.target,...this.flowerSlots].forEach((slot,i)=>{
       const p=this.point(slot); const o=this.add.image(p.x,p.y+12,i===0?'eppy':'flower').setDisplaySize(104,112).setDepth(3).setAlpha(0);
       this.objects.push(o); this.tweens.add({targets:o,y:p.y,alpha:1,duration:130,ease:'Back.out'});
@@ -127,7 +127,7 @@ class Park extends Phaser.Scene {
     sound.effect(good); this.gap=good?1100:900; this.sync();
   }
   sync() {
-    $('round-label').textContent=`ROUND 0${this.round.level} / 03`;
+    $('round-label').textContent=`ROUND ${String(this.round.level).padStart(2, '0')} / ${TOTAL_ROUNDS}`;
     $('score').textContent=String(this.round.score);$('attempt').textContent=`${Math.min(10,this.round.outcomes.length+(this.round.locked?0:1)) || 1} / 10`;
     $('pips').innerHTML=Array.from({length:10},(_,i)=>`<span class="pip ${this.round.outcomes[i] ? this.round.outcomes[i]==='eppy'?'good':'bad':''}"></span>`).join('');
   }

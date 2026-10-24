@@ -1,5 +1,8 @@
 export type Hit = 'eppy' | 'flower' | 'empty' | 'miss';
-export const DURATIONS = [3000, 2200, 1600] as const;
+export const TOTAL_ROUNDS = 20;
+// Speed rises by the same ratio each round; duration is inverse speed.
+export const DURATIONS = Array.from({ length: TOTAL_ROUNDS }, (_, i) =>
+  (3000 / 1.3) / Math.pow(15, i / (TOTAL_ROUNDS - 1)));
 export const DELTAS: Record<Hit, number> = { eppy: 1, flower: -2, empty: -1, miss: 0 };
 export class Round {
   score = 0;
@@ -27,6 +30,6 @@ export function positions(random = Math.random) {
   return slots;
 }
 export function readBest() {
-  try { const n = Number(localStorage.getItem('kiss-park-best')); return Number.isFinite(n) ? Math.min(30, Math.max(0, n)) : 0; } catch { return 0; }
+  try { const n = Number(localStorage.getItem('kiss-park-best')); return Number.isFinite(n) ? Math.min(TOTAL_ROUNDS * 10, Math.max(0, n)) : 0; } catch { return 0; }
 }
 export function saveBest(score: number) { const best = Math.max(readBest(), score); try { localStorage.setItem('kiss-park-best', String(best)); } catch { /* Storage may be unavailable in private mode. */ } return best; }

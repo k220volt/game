@@ -3,14 +3,15 @@ type State={playing:boolean;paused:boolean;locked:boolean;score:number;attempts:
 const state=(p:Page)=>p.evaluate(()=> (window as unknown as {__park:State}).__park);
 async function slot(p:Page,n:number,touch=false){const b=(await p.locator('canvas').boundingBox())!;const x=b.x+(86+n%3*124)/420*b.width,y=b.y+(302+Math.floor(n/3)*117)/740*b.height;if(touch)await p.touchscreen.tap(x,y);else await p.mouse.click(x,y);}
 async function ready(p:Page){await expect.poll(async()=>{const s=await state(p);return s?.playing&&!s.locked&&!s.paused;}).toBe(true);}
-test('mobile touch, 3 rounds, result animation, persisted best and restart',async({browser})=>{
+async function clockReady(p:Page){await p.clock.runFor(1050);for(let i=0;i<40;i++){const s=await state(p);if(s.playing&&!s.locked&&!s.paused)return;await p.clock.runFor(16);}throw new Error('Opportunity did not open');}
+test('mobile touch, 20 rounds, result animation, persisted best and restart',async({browser})=>{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:3});const p=await context.newPage();const errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));p.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
- await p.goto((process.env.GAME_URL || 'http://127.0.0.1:5174/game/')+'?test');await expect(p.locator('#start')).toBeVisible();await p.screenshot({path:'test-results/mobile-home.png'});await p.locator('#start').tap();
- for(let round=1;round<=3;round++){
-  for(let i=0;i<10;i++){await ready(p);const s=await state(p);await slot(p,s.target,true);if(i===0&&round===1)await p.screenshot({path:'test-results/mobile-kiss.png'});await expect.poll(async()=>(await state(p)).attempts).toBe(i+1);}
-  await expect(p.locator('#next')).toBeVisible();expect((await state(p)).score).toBe(10);await p.screenshot({path:`test-results/round-${round}-clear.png`});if(round<3)await p.locator('#next').tap();
+ await p.goto((process.env.GAME_URL || 'http://127.0.0.1:5174/game/')+'?test');await expect(p.locator('#start')).toBeVisible();await p.screenshot({path:'test-results/mobile-home.png'});await p.clock.install();await p.clock.pauseAt(new Date(Date.now()+1000));await p.locator('#start').tap();
+ for(let round=1;round<=20;round++){
+  for(let i=0;i<10;i++){await clockReady(p);const s=await state(p);await slot(p,s.target,true);if(i===0&&round===1)await p.screenshot({path:'test-results/mobile-kiss.png'});await expect.poll(async()=>(await state(p)).attempts).toBe(i+1);}
+  await p.clock.runFor(1200);await expect(p.locator('#next')).toBeVisible();await expect(p.locator('#round-label')).toHaveText(`ROUND ${String(round).padStart(2,'0')} / 20`);expect((await state(p)).flowers.length).toBe(Math.min(round+1,4));expect((await state(p)).score).toBe(10);await p.screenshot({path:`test-results/round-${round}-clear.png`});if(round<20)await p.locator('#next').tap();
  }
- await expect(p.locator('h2').filter({hasText:'우리 사랑'})).toBeVisible();expect(await p.evaluate(()=>localStorage.getItem('kiss-park-best'))).toBe('30');await p.locator('#next').tap();await ready(p);expect((await state(p)).level).toBe(1);expect((await state(p)).score).toBe(0);await p.reload();await expect(p.locator('#best')).toHaveText('BEST 30');expect(errors).toEqual([]);await context.close();
+ await expect(p.locator('h2').filter({hasText:'우리 사랑'})).toBeVisible();expect(await p.evaluate(()=>localStorage.getItem('kiss-park-best'))).toBe('200');await p.locator('#next').tap();await clockReady(p);expect((await state(p)).level).toBe(1);expect((await state(p)).score).toBe(0);await p.reload();await expect(p.locator('#best')).toHaveText('BEST 200');expect(errors).toEqual([]);await context.close();
 });
 test('mouse penalties, pause freezes clock, rapid clicks, timeout and failure',async({page:p})=>{
  await p.setViewportSize({width:1440,height:1000});await p.goto('?test');await expect(p.locator('#start')).toBeVisible();await expect.poll(()=>p.locator('img').evaluateAll(imgs=>imgs.every(img=>(img as HTMLImageElement).naturalWidth>0))).toBe(true);await p.screenshot({path:'test-results/desktop-home.png'});await p.locator('#start').click();await ready(p);
